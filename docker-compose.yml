@@ -1,50 +1,61 @@
-version: "3.8"
-
 services:
   rabbitmq:
-    image: rabbitmq:3-management
+    image: rabbitmq:3-management-alpine
     container_name: voiderp_rabbitmq
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "5673:5672"
+      - "15673:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: rabbitmq-diagnostics -q ping
       interval: 5s
-      timeout: 10s
+      timeout: 5s
+      retries: 10
+
+  sap_mock:
+    build:
+      context: ./sap_mock
+    container_name: voiderp_sap_mock
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 5s
+      timeout: 5s
       retries: 5
 
-  control_pod:
-    build: .
-    container_name: voiderp_control
+  data_pod:
+    build:
+      context: ./data_pod
+    container_name: voiderp_data_pod
     environment:
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - SAP_MOCK_URL=http://sap_mock:8000
       - PYTHONUNBUFFERED=1
-    tty: true
-    command: python pod/control_pod/main.py
     depends_on:
-      rabbitmq:
-        condition: service_healthy
+      - rabbitmq
+      - sap_mock
 
   intelligence_pod:
-    build: .
-    container_name: voiderp_intelligence
+    build:
+      context: ./intelligence_pod
+    container_name: voiderp_intelligence_pod
     environment:
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - PYTHONUNBUFFERED=1
-    tty: true
-    command: python pod/intelligence_pod/main.py
     depends_on:
       rabbitmq:
         condition: service_healthy
 
-  data_pod:
-    build: .
-    container_name: voiderp_data
+  control_pod:
+    build:
+      context: ./control_pod
+    container_name: voiderp_control_pod
     environment:
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - PYTHONUNBUFFERED=1
-    tty: true
-    command: python pod/data_pod/ingestion.py
     depends_on:
       rabbitmq:
         condition: service_healthy
