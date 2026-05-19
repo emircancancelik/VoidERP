@@ -47,19 +47,17 @@ async def generate_mock_trades(channel: aio_pika.abc.AbstractChannel, count: int
         await exchange.publish(message, routing_key=queue_name)
         logger.info(f"Yayınlandı: {payload.trade_id} | {payload.transaction_type} {payload.volume} {payload.asset_pair}")
         
-        # İşlemler arası rastgele mikro gecikme (gerçekçi akış simülasyonu)
         await asyncio.sleep(random.uniform(0.1, 0.5))
 
 async def main():
-    # Mac portu olan 5673'e bağlanıyoruz
-    amqp_url = "amqp://guest:guest@localhost:5673/"
+    # CRITICAL FIX: Mac terminalinden Docker içindeki RabbitMQ'ya bağlanmak için localhost kullanılmalı.
+    amqp_url = "amqp://guest:guest@localhost:5672/"
     
     logger.info("RabbitMQ'ya bağlanılıyor...")
     connection = await aio_pika.connect_robust(amqp_url)
     
     async with connection:
         channel = await connection.channel()
-        # Kuyruğun var olduğundan emin ol (durable=True veri kaybını önler)
         await channel.declare_queue("treasury_trades_queue", durable=True)
         
         logger.info("Test verileri (Mock Trades) oluşturuluyor...")

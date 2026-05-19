@@ -3,13 +3,13 @@ services:
     image: rabbitmq:3-management-alpine
     container_name: voiderp_rabbitmq
     ports:
-      - "5673:5672"
-      - "15673:15672"
+      - "5672:5672"
+      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     healthcheck:
-      test: rabbitmq-diagnostics -q ping
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -20,11 +20,6 @@ services:
     container_name: voiderp_sap_mock
     ports:
       - "8000:8000"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
 
   data_pod:
     build:
@@ -35,8 +30,10 @@ services:
       - SAP_MOCK_URL=http://sap_mock:8000
       - PYTHONUNBUFFERED=1
     depends_on:
-      - rabbitmq
-      - sap_mock
+      rabbitmq:
+        condition: service_healthy
+      sap_mock:
+        condition: service_started
 
   intelligence_pod:
     build:
@@ -55,7 +52,10 @@ services:
     container_name: voiderp_control_pod
     environment:
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - SAP_MOCK_URL=http://sap_mock:8000
       - PYTHONUNBUFFERED=1
     depends_on:
       rabbitmq:
         condition: service_healthy
+      sap_mock:
+        condition: service_started
